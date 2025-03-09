@@ -110,9 +110,7 @@ const Index = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
-                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor" />
-              </svg>
+              <span className="text-2xl font-bold">luma<span className="text-purple-500">+</span></span>
             </div>
             <div className="flex items-center space-x-6">
               <Link to="/events" className="text-white/70 hover:text-white text-sm">
@@ -121,6 +119,9 @@ const Index = () => {
               <Link to="/login" className="text-white/70 hover:text-white text-sm">
                 Sign In
               </Link>
+              <Button asChild variant="secondary" size="sm" className="bg-purple-600 hover:bg-purple-700 text-white border-none">
+                <Link to="/signup">Sign Up</Link>
+              </Button>
             </div>
           </div>
         </div>
@@ -129,31 +130,26 @@ const Index = () => {
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-purple-900/20 via-transparent to-[#0F0F13] z-0"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-purple-900/20 via-[#0F0F13]/80 to-[#0F0F13] z-0"></div>
         
         {/* Content */}
         <div className="container mx-auto px-4 pt-32 pb-32 md:pt-40 md:pb-48 relative z-10">
           <div className="flex flex-col lg:flex-row items-center">
             {/* Left side content */}
             <div className="w-full lg:w-1/2 mb-16 lg:mb-0">
-              <div className="text-2xl font-semibold mb-4 flex items-center">
-                <span className="text-white/80">luma</span>
-                <span className="text-white ml-1">+</span>
-              </div>
-              
               <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6">
                 Delightful
                 <br />
                 events
                 <br />
-                <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text">start</span> <span className="bg-gradient-to-r from-pink-500 to-red-500 text-transparent bg-clip-text">here.</span>
+                <span className="text-purple-500">start</span> <span className="text-purple-300">here.</span>
               </h1>
               
               <p className="text-xl text-white/80 mb-8 max-w-lg">
                 Set up an event page, invite friends and sell tickets. Host a memorable event today.
               </p>
               
-              <Button asChild size="lg" className="bg-white text-black hover:bg-white/90 px-8 py-6 text-lg rounded-md">
+              <Button asChild size="lg" className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-6 text-lg rounded-md">
                 <Link to="/create">Create Your First Event</Link>
               </Button>
             </div>
@@ -176,22 +172,22 @@ const Index = () => {
                 </div>
                 
                 {/* Decorative elements */}
-                <div className="absolute -top-10 -right-10 w-20 h-20 text-pink-500 animate-pulse opacity-70">
+                <div className="absolute -top-10 -right-10 w-20 h-20 text-purple-500 animate-pulse opacity-70">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                   </svg>
                 </div>
-                <div className="absolute -bottom-5 -left-5 w-16 h-16 text-blue-500 animate-bounce opacity-70">
+                <div className="absolute -bottom-5 -left-5 w-16 h-16 text-purple-400 animate-bounce opacity-70">
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <circle cx="12" cy="12" r="10" />
                   </svg>
                 </div>
-                <div className="absolute top-1/4 -right-16 w-12 h-12 text-purple-500 animate-pulse opacity-50">
+                <div className="absolute top-1/4 -right-16 w-12 h-12 text-purple-300 animate-pulse opacity-50">
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
                   </svg>
                 </div>
-                <div className="absolute bottom-1/3 -left-12 w-10 h-10 text-yellow-500 animate-bounce opacity-50 delay-300">
+                <div className="absolute bottom-1/3 -left-12 w-10 h-10 text-purple-200 animate-bounce opacity-50 delay-300">
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M21 16V8.00002C21 6.34317 19.6569 5.00002 18 5.00002H6C4.34315 5.00002 3 6.34317 3 8.00002V16C3 17.6569 4.34315 19 6 19H18C19.6569 19 21 17.6569 21 16Z" />
                   </svg>
@@ -217,7 +213,7 @@ const Index = () => {
           ) : featuredEvents.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-white/70 mb-6">No upcoming events at the moment.</p>
-              <Button asChild className="bg-purple-600 hover:bg-purple-700">
+              <Button asChild className="bg-purple-600 hover:bg-purple-700 text-white">
                 <Link to="/create">Create the first event</Link>
               </Button>
             </div>
@@ -249,7 +245,7 @@ const Index = () => {
                     </div>
                   </CardContent>
                   <CardFooter className="p-5 pt-0">
-                    <Button asChild className="w-full bg-purple-600 hover:bg-purple-700">
+                    <Button asChild className="w-full bg-purple-600 hover:bg-purple-700 text-white">
                       <Link to={`/events/${event.id}`}>View Details</Link>
                     </Button>
                   </CardFooter>
@@ -280,8 +276,8 @@ const Index = () => {
             <p className="text-white/70">Create beautiful event pages in minutes with our intuitive editor.</p>
           </div>
           <div className="bg-[#1C1C24] p-8 rounded-xl">
-            <div className="w-14 h-14 bg-blue-900/50 rounded-full flex items-center justify-center mb-6">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-14 h-14 bg-purple-900/50 rounded-full flex items-center justify-center mb-6">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
@@ -290,8 +286,8 @@ const Index = () => {
             <p className="text-white/70">Manage registrations, send updates, and communicate with your attendees.</p>
           </div>
           <div className="bg-[#1C1C24] p-8 rounded-xl">
-            <div className="w-14 h-14 bg-pink-900/50 rounded-full flex items-center justify-center mb-6">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-14 h-14 bg-purple-900/50 rounded-full flex items-center justify-center mb-6">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
             </div>
@@ -303,12 +299,12 @@ const Index = () => {
 
       {/* CTA Section */}
       <div className="container mx-auto px-4 py-16 md:py-24">
-        <div className="bg-gradient-to-r from-purple-800 to-pink-700 rounded-2xl p-10 md:p-16 text-center">
+        <div className="bg-[#1C1C24] border border-purple-500/20 rounded-2xl p-10 md:p-16 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">Ready to host your next event?</h2>
           <p className="text-white/80 mb-8 max-w-2xl mx-auto">
             Join thousands of event creators who trust our platform for their events.
           </p>
-          <Button asChild size="lg" className="bg-white text-black hover:bg-white/90 px-8 py-6 text-lg rounded-md">
+          <Button asChild size="lg" className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-6 text-lg rounded-md">
             <Link to="/signup">Get Started for Free</Link>
           </Button>
         </div>
