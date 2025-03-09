@@ -58,6 +58,19 @@ const Events = () => {
     try {
       console.log("Updating attendee count for event:", eventId);
       
+      // Get all registrations for this event to debug
+      const { data: registrations, error: regError } = await supabase
+        .from("registrations")
+        .select('user_id')
+        .eq("event_id", eventId);
+        
+      if (regError) {
+        console.error("Error fetching registrations:", regError);
+      } else {
+        console.log("All registrations for event:", registrations);
+      }
+      
+      // Get the count
       const { count, error } = await supabase
         .from("registrations")
         .select('*', { count: 'exact', head: true })
@@ -101,6 +114,19 @@ const Events = () => {
       // Then, for each event, get the attendee count
       const eventsWithCounts = await Promise.all(
         eventsData.map(async (event) => {
+          // Get all registrations for this event to debug
+          const { data: registrations, error: regError } = await supabase
+            .from("registrations")
+            .select('user_id')
+            .eq("event_id", event.id);
+            
+          if (regError) {
+            console.error("Error fetching registrations for event", event.id, ":", regError);
+          } else {
+            console.log("Event", event.id, "registrations:", registrations);
+          }
+          
+          // Get the count
           const { count, error } = await supabase
             .from("registrations")
             .select('*', { count: 'exact', head: true })
@@ -111,6 +137,7 @@ const Events = () => {
             return { ...event, attendee_count: 0 };
           }
 
+          console.log("Event", event.id, "attendee count:", count);
           return { ...event, attendee_count: count || 0 };
         })
       );

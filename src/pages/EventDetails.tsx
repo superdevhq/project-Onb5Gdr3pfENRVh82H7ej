@@ -118,6 +118,20 @@ const EventDetails = () => {
     
     try {
       console.log("Fetching attendee count for event:", id);
+      
+      // Get all registrations for this event to debug
+      const { data: registrations, error: regError } = await supabase
+        .from("registrations")
+        .select('user_id')
+        .eq("event_id", id);
+        
+      if (regError) {
+        console.error("Error fetching registrations:", regError);
+      } else {
+        console.log("All registrations for event:", registrations);
+      }
+      
+      // Get the count
       const { count, error } = await supabase
         .from("registrations")
         .select('*', { count: 'exact', head: true })
@@ -174,6 +188,31 @@ const EventDetails = () => {
 
     setIsRegistering(true);
     try {
+      // Check if user is already registered
+      const { data: existingReg, error: checkError } = await supabase
+        .from("registrations")
+        .select("id")
+        .eq("event_id", event.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+        
+      if (checkError) {
+        throw checkError;
+      }
+      
+      // If already registered, don't register again
+      if (existingReg) {
+        console.log("User already registered:", existingReg);
+        setIsUserRegistered(true);
+        toast({
+          title: "Already Registered",
+          description: `You're already registered for ${event.title}.`
+        });
+        setIsRegistering(false);
+        return;
+      }
+
+      // Register the user
       const { error } = await supabase
         .from("registrations")
         .insert({
