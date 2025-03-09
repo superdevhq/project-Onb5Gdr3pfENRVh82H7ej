@@ -18,32 +18,74 @@ const Index = () => {
 
   useEffect(() => {
     fetchFeaturedEvents();
+
+    // Set up real-time subscription for registrations
+    const registrationsSubscription = supabase
+      .channel('home-registrations')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'registrations'
+      }, () => {
+        // Refresh events when registrations change
+        fetchFeaturedEvents();
+      })
+      .subscribe();
+
+    // Set up real-time subscription for new events
+    const eventsSubscription = supabase
+      .channel('home-events')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'events'
+      }, () => {
+        // Refresh events when new events are created
+        fetchFeaturedEvents();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(registrationsSubscription);
+      supabase.removeChannel(eventsSubscription);
+    };
   }, []);
 
   const fetchFeaturedEvents = async () => {
     try {
-      const { data, error } = await supabase
+      // First, fetch upcoming events
+      const { data: eventsData, error: eventsError } = await supabase
         .from("events")
         .select(`
           *,
-          profiles(*),
-          attendee_count:registrations(count)
+          profiles(*)
         `)
         .gte('date', new Date().toISOString()) // Only future events
         .order('date', { ascending: true })
         .limit(3);
 
-      if (error) {
-        throw error;
+      if (eventsError) {
+        throw eventsError;
       }
 
-      // Transform the data to match our EventWithDetails type
-      const formattedEvents = data.map(event => ({
-        ...event,
-        attendee_count: event.attendee_count[0]?.count || 0
-      }));
+      // Then, for each event, get the attendee count
+      const eventsWithCounts = await Promise.all(
+        eventsData.map(async (event) => {
+          const { count, error } = await supabase
+            .from("registrations")
+            .select('*', { count: 'exact', head: true })
+            .eq("event_id", event.id);
 
-      setFeaturedEvents(formattedEvents);
+          if (error) {
+            console.error("Error fetching attendee count:", error);
+            return { ...event, attendee_count: 0 };
+          }
+
+          return { ...event, attendee_count: count || 0 };
+        })
+      );
+
+      setFeaturedEvents(eventsWithCounts);
     } catch (error) {
       console.error("Error fetching featured events:", error);
     } finally {

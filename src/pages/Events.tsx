@@ -22,32 +22,59 @@ const Events = () => {
   
   useEffect(() => {
     fetchEvents();
+
+    // Set up real-time subscription for registrations
+    const registrationsSubscription = supabase
+      .channel('public-registrations')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'registrations'
+      }, () => {
+        // Refresh events when registrations change
+        fetchEvents();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(registrationsSubscription);
+    };
   }, []);
 
   const fetchEvents = async () => {
     setIsLoading(true);
     try {
-      // Fetch events with organizer profile and attendee count
-      const { data, error } = await supabase
+      // First, fetch all events with their basic details
+      const { data: eventsData, error: eventsError } = await supabase
         .from("events")
         .select(`
           *,
-          profiles:organizer_id(*),
-          attendee_count:registrations(count)
+          profiles(*)
         `)
         .order('date', { ascending: true });
 
-      if (error) {
-        throw error;
+      if (eventsError) {
+        throw eventsError;
       }
 
-      // Transform the data to match our Event type
-      const formattedEvents = data.map(event => ({
-        ...event,
-        attendee_count: event.attendee_count[0]?.count || 0
-      }));
+      // Then, for each event, get the attendee count
+      const eventsWithCounts = await Promise.all(
+        eventsData.map(async (event) => {
+          const { count, error } = await supabase
+            .from("registrations")
+            .select('*', { count: 'exact', head: true })
+            .eq("event_id", event.id);
 
-      setEvents(formattedEvents);
+          if (error) {
+            console.error("Error fetching attendee count:", error);
+            return { ...event, attendee_count: 0 };
+          }
+
+          return { ...event, attendee_count: count || 0 };
+        })
+      );
+
+      setEvents(eventsWithCounts);
     } catch (error) {
       console.error("Error fetching events:", error);
       toast({

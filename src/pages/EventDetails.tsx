@@ -30,12 +30,34 @@ const EventDetails = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isUserRegistered, setIsUserRegistered] = useState(false);
+  const [attendeeCount, setAttendeeCount] = useState(0);
   const { toast } = useToast();
   const { user } = useAuth();
 
   useEffect(() => {
     if (id) {
       fetchEventDetails();
+      fetchAttendeeCount();
+    }
+
+    // Set up real-time subscription for registrations
+    if (id) {
+      const registrationsSubscription = supabase
+        .channel('event-registrations')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'registrations',
+          filter: `event_id=eq.${id}`
+        }, () => {
+          // Refresh attendee count when registrations change
+          fetchAttendeeCount();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(registrationsSubscription);
+      };
     }
   }, [id]);
 
@@ -53,8 +75,7 @@ const EventDetails = () => {
         .select(`
           *,
           profiles(*),
-          agenda_items(id, title, time, display_order),
-          attendee_count:registrations(count)
+          agenda_items(id, title, time, display_order)
         `)
         .eq("id", id)
         .single();
@@ -71,7 +92,7 @@ const EventDetails = () => {
       setEvent({
         ...data,
         agenda_items: sortedAgendaItems,
-        attendee_count: data.attendee_count[0]?.count || 0
+        attendee_count: 0 // Will be updated by fetchAttendeeCount
       });
     } catch (error) {
       console.error("Error fetching event details:", error);
@@ -82,6 +103,30 @@ const EventDetails = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchAttendeeCount = async () => {
+    if (!id) return;
+    
+    try {
+      const { count, error } = await supabase
+        .from("registrations")
+        .select('*', { count: 'exact', head: true })
+        .eq("event_id", id);
+
+      if (error) {
+        throw error;
+      }
+
+      setAttendeeCount(count || 0);
+      
+      // Update event object if it exists
+      if (event) {
+        setEvent(prev => prev ? { ...prev, attendee_count: count || 0 } : null);
+      }
+    } catch (error) {
+      console.error("Error fetching attendee count:", error);
     }
   };
 
@@ -138,8 +183,7 @@ const EventDetails = () => {
       
       setIsUserRegistered(true);
       setIsRegisterDialogOpen(false);
-      // Refresh event details to update attendee count
-      fetchEventDetails();
+      // Attendee count will be updated by the subscription
     } catch (error) {
       console.error("Error registering for event:", error);
       toast({
@@ -173,8 +217,7 @@ const EventDetails = () => {
       });
       
       setIsUserRegistered(false);
-      // Refresh event details to update attendee count
-      fetchEventDetails();
+      // Attendee count will be updated by the subscription
     } catch (error) {
       console.error("Error cancelling registration:", error);
       toast({
@@ -331,7 +374,7 @@ const EventDetails = () => {
                   <Users className="h-5 w-5 mr-3 mt-0.5 text-gray-500" />
                   <div>
                     <p className="font-medium">Attendees</p>
-                    <p className="text-gray-600">{event.attendee_count} people attending</p>
+                    <p className="text-gray-600">{attendeeCount} people attending</p>
                   </div>
                 </div>
               </div>

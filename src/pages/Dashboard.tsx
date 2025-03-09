@@ -42,6 +42,36 @@ const Dashboard = () => {
     if (user) {
       fetchMyEvents();
       fetchRegisteredEvents();
+
+      // Set up real-time subscription for events and registrations
+      const eventsSubscription = supabase
+        .channel('dashboard-events')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'events',
+          filter: `organizer_id=eq.${user.id}`
+        }, () => {
+          fetchMyEvents();
+        })
+        .subscribe();
+
+      const registrationsSubscription = supabase
+        .channel('dashboard-registrations')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'registrations'
+        }, () => {
+          fetchMyEvents();
+          fetchRegisteredEvents();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(eventsSubscription);
+        supabase.removeChannel(registrationsSubscription);
+      };
     }
   }, [user]);
 
@@ -49,27 +79,38 @@ const Dashboard = () => {
     if (!user) return;
     
     try {
-      const { data, error } = await supabase
+      // First, fetch all events organized by the user
+      const { data: eventsData, error: eventsError } = await supabase
         .from("events")
         .select(`
           *,
-          profiles(*),
-          attendee_count:registrations(count)
+          profiles(*)
         `)
         .eq("organizer_id", user.id)
         .order('date', { ascending: true });
 
-      if (error) {
-        throw error;
+      if (eventsError) {
+        throw eventsError;
       }
 
-      // Transform the data to match our EventWithDetails type
-      const formattedEvents = data.map(event => ({
-        ...event,
-        attendee_count: event.attendee_count[0]?.count || 0
-      }));
+      // Then, for each event, get the attendee count
+      const eventsWithCounts = await Promise.all(
+        eventsData.map(async (event) => {
+          const { count, error } = await supabase
+            .from("registrations")
+            .select('*', { count: 'exact', head: true })
+            .eq("event_id", event.id);
 
-      setMyEvents(formattedEvents);
+          if (error) {
+            console.error("Error fetching attendee count:", error);
+            return { ...event, attendee_count: 0 };
+          }
+
+          return { ...event, attendee_count: count || 0 };
+        })
+      );
+
+      setMyEvents(eventsWithCounts);
     } catch (error) {
       console.error("Error fetching my events:", error);
       toast({
@@ -110,8 +151,7 @@ const Dashboard = () => {
         .from("events")
         .select(`
           *,
-          profiles(*),
-          attendee_count:registrations(count)
+          profiles(*)
         `)
         .in("id", eventIds)
         .order('date', { ascending: true });
@@ -120,13 +160,24 @@ const Dashboard = () => {
         throw eventsError;
       }
 
-      // Transform the data to match our EventWithDetails type
-      const formattedEvents = eventsData.map(event => ({
-        ...event,
-        attendee_count: event.attendee_count[0]?.count || 0
-      }));
+      // Then, for each event, get the attendee count
+      const eventsWithCounts = await Promise.all(
+        eventsData.map(async (event) => {
+          const { count, error } = await supabase
+            .from("registrations")
+            .select('*', { count: 'exact', head: true })
+            .eq("event_id", event.id);
 
-      setRegisteredEvents(formattedEvents);
+          if (error) {
+            console.error("Error fetching attendee count:", error);
+            return { ...event, attendee_count: 0 };
+          }
+
+          return { ...event, attendee_count: count || 0 };
+        })
+      );
+
+      setRegisteredEvents(eventsWithCounts);
     } catch (error) {
       console.error("Error fetching registered events:", error);
       toast({
@@ -181,9 +232,7 @@ const Dashboard = () => {
         description: "The event has been successfully deleted."
       });
       
-      // Refresh the events list
-      fetchMyEvents();
-      fetchRegisteredEvents();
+      // Events will be refreshed by the subscription
     } catch (error) {
       console.error("Error deleting event:", error);
       toast({
