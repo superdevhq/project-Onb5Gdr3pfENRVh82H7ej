@@ -104,17 +104,38 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F0F13] text-white overflow-hidden">
+    <div className="min-h-screen bg-[#0F0F13] text-white">
+      {/* Custom Navbar for Landing Page */}
+      <header className="absolute top-0 left-0 right-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
+                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor" />
+              </svg>
+            </div>
+            <div className="flex items-center space-x-6">
+              <Link to="/events" className="text-white/70 hover:text-white text-sm">
+                Explore Events
+              </Link>
+              <Link to="/login" className="text-white/70 hover:text-white text-sm">
+                Sign In
+              </Link>
+            </div>
+          </div>
+        </div>
+      </header>
+
       {/* Hero Section */}
-      <div className="relative">
+      <div className="relative overflow-hidden">
         {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-purple-900/20 via-transparent to-[#0F0F13] z-10"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-purple-900/20 via-transparent to-[#0F0F13] z-0"></div>
         
         {/* Content */}
-        <div className="container mx-auto px-4 pt-20 pb-32 md:pt-32 md:pb-48 relative z-20">
+        <div className="container mx-auto px-4 pt-32 pb-32 md:pt-40 md:pb-48 relative z-10">
           <div className="flex flex-col lg:flex-row items-center">
             {/* Left side content */}
-            <div className="w-full lg:w-1/2 mb-12 lg:mb-0">
+            <div className="w-full lg:w-1/2 mb-16 lg:mb-0">
               <div className="text-2xl font-semibold mb-4 flex items-center">
                 <span className="text-white/80">luma</span>
                 <span className="text-white ml-1">+</span>
@@ -155,14 +176,24 @@ const Index = () => {
                 </div>
                 
                 {/* Decorative elements */}
-                <div className="absolute -top-10 -right-10 w-20 h-20 text-pink-500 animate-pulse">
+                <div className="absolute -top-10 -right-10 w-20 h-20 text-pink-500 animate-pulse opacity-70">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                   </svg>
                 </div>
-                <div className="absolute -bottom-5 -left-5 w-16 h-16 text-blue-500 animate-bounce">
+                <div className="absolute -bottom-5 -left-5 w-16 h-16 text-blue-500 animate-bounce opacity-70">
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <circle cx="12" cy="12" r="10" />
+                  </svg>
+                </div>
+                <div className="absolute top-1/4 -right-16 w-12 h-12 text-purple-500 animate-pulse opacity-50">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
+                  </svg>
+                </div>
+                <div className="absolute bottom-1/3 -left-12 w-10 h-10 text-yellow-500 animate-bounce opacity-50 delay-300">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M21 16V8.00002C21 6.34317 19.6569 5.00002 18 5.00002H6C4.34315 5.00002 3 6.34317 3 8.00002V16C3 17.6569 4.34315 19 6 19H18C19.6569 19 21 17.6569 21 16Z" />
                   </svg>
                 </div>
               </div>
