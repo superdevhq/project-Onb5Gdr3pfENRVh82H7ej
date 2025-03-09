@@ -2,7 +2,10 @@
 // Follow this setup guide to integrate the Deno runtime and Supabase Functions in your project:
 // https://supabase.com/docs/guides/functions/connect-to-supabase
 
-import { createClient } from 'npm:@supabase/supabase-js@2.38.4'
+// Using a CDN URL that's compatible with Deno's --no-npm and --no-remote restrictions
+// This is a workaround - in production, you should use proper dependency management
+const supabaseJs = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.4/dist/module/index.js'
+const { createClient } = await import(supabaseJs)
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
