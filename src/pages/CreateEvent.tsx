@@ -6,12 +6,27 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/hooks/use-toast";
-import { Calendar, Clock, MapPin, Upload } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Calendar, Clock, MapPin, Upload, Plus, X } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { v4 as uuidv4 } from "uuid";
+
+interface AgendaItem {
+  id: string;
+  time: string;
+  title: string;
+  display_order: number;
+}
 
 const CreateEvent = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([
+    { id: uuidv4(), time: "", title: "", display_order: 0 }
+  ]);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -39,8 +54,50 @@ const CreateEvent = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleAgendaChange = (id: string, field: 'time' | 'title', value: string) => {
+    setAgendaItems(prev => 
+      prev.map(item => 
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    );
+  };
+
+  const addAgendaItem = () => {
+    setAgendaItems(prev => [
+      ...prev, 
+      { 
+        id: uuidv4(), 
+        time: "", 
+        title: "", 
+        display_order: prev.length 
+      }
+    ]);
+  };
+
+  const removeAgendaItem = (id: string) => {
+    if (agendaItems.length > 1) {
+      setAgendaItems(prev => {
+        const filtered = prev.filter(item => item.id !== id);
+        // Update display_order for remaining items
+        return filtered.map((item, index) => ({
+          ...item,
+          display_order: index
+        }));
+      });
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!user) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to create an event",
+        variant: "destructive"
+      });
+      return;
+    }
     
     // Validate form
     if (!formData.title || !formData.description || !formData.date || 
@@ -53,17 +110,101 @@ const CreateEvent = () => {
       return;
     }
 
+    // Validate agenda items
+    const validAgendaItems = agendaItems.filter(item => item.time && item.title);
+    if (validAgendaItems.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please add at least one agenda item with both time and title",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
-    // In a real app, this would send data to a server
-    setTimeout(() => {
+    try {
+      // Combine date and time
+      const eventDate = new Date(`${formData.date}T${formData.startTime}`);
+      const eventEndTime = new Date(`${formData.date}T${formData.endTime}`);
+      
+      let imageUrl = null;
+      
+      // Upload image if provided
+      if (formData.image) {
+        const fileExt = formData.image.name.split('.').pop();
+        const fileName = `${uuidv4()}.${fileExt}`;
+        const filePath = `event-images/${fileName}`;
+        
+        const { error: uploadError, data } = await supabase.storage
+          .from('events')
+          .upload(filePath, formData.image);
+          
+        if (uploadError) {
+          throw uploadError;
+        }
+        
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('events')
+          .getPublicUrl(filePath);
+          
+        imageUrl = publicUrl;
+      }
+      
+      // Create event
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .insert({
+          title: formData.title,
+          description: formData.description,
+          date: eventDate.toISOString(),
+          end_time: eventEndTime.toISOString(),
+          location: formData.location,
+          image_url: imageUrl,
+          organizer_id: user.id
+        })
+        .select()
+        .single();
+        
+      if (eventError) {
+        throw eventError;
+      }
+      
+      // Add agenda items
+      if (validAgendaItems.length > 0) {
+        const agendaItemsToInsert = validAgendaItems.map((item, index) => ({
+          event_id: eventData.id,
+          time: item.time,
+          title: item.title,
+          display_order: index
+        }));
+        
+        const { error: agendaError } = await supabase
+          .from('agenda_items')
+          .insert(agendaItemsToInsert);
+          
+        if (agendaError) {
+          throw agendaError;
+        }
+      }
+      
       toast({
         title: "Event Created!",
         description: "Your event has been created successfully."
       });
+      
+      navigate(`/events/${eventData.id}`);
+    } catch (error) {
+      console.error("Error creating event:", error);
+      toast({
+        title: "Error",
+        description: "There was an error creating your event. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
       setIsSubmitting(false);
-      navigate("/dashboard");
-    }, 1500);
+    }
   };
 
   return (
@@ -185,6 +326,59 @@ const CreateEvent = () => {
           
           <Card className="mb-8">
             <CardContent className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Agenda</h2>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={addAgendaItem}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Item
+                </Button>
+              </div>
+              
+              <div className="space-y-4">
+                {agendaItems.map((item, index) => (
+                  <div key={item.id} className="flex items-start gap-4">
+                    <div className="w-1/3">
+                      <Label htmlFor={`agenda-time-${item.id}`}>Time</Label>
+                      <Input
+                        id={`agenda-time-${item.id}`}
+                        placeholder="e.g. 10:00 AM"
+                        value={item.time}
+                        onChange={(e) => handleAgendaChange(item.id, 'time', e.target.value)}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <Label htmlFor={`agenda-title-${item.id}`}>Description</Label>
+                      <Input
+                        id={`agenda-title-${item.id}`}
+                        placeholder="e.g. Welcome & Introduction"
+                        value={item.title}
+                        onChange={(e) => handleAgendaChange(item.id, 'title', e.target.value)}
+                      />
+                    </div>
+                    {agendaItems.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="mt-6"
+                        onClick={() => removeAgendaItem(item.id)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="mb-8">
+            <CardContent className="p-6">
               <h2 className="text-xl font-semibold mb-4">Event Image</h2>
               
               <div className="space-y-4">
@@ -245,7 +439,7 @@ const CreateEvent = () => {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/events")}
             >
               Cancel
             </Button>

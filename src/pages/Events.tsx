@@ -1,82 +1,69 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Search, Users } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Tables } from "@/integrations/supabase/types";
+import { useToast } from "@/hooks/use-toast";
 
-// Mock data for events
-const mockEvents = [
-  {
-    id: "1",
-    title: "Web Development Workshop",
-    description: "Learn the basics of web development with HTML, CSS, and JavaScript.",
-    date: "2023-06-15T10:00:00",
-    location: "Online",
-    image: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97",
-    organizer: "Tech Academy",
-    attendees: 45
-  },
-  {
-    id: "2",
-    title: "Startup Networking Mixer",
-    description: "Connect with fellow entrepreneurs and investors in a casual setting.",
-    date: "2023-06-20T18:00:00",
-    location: "Innovation Hub, San Francisco",
-    image: "https://images.unsplash.com/photo-1515187029135-18ee286d815b",
-    organizer: "Founder Network",
-    attendees: 120
-  },
-  {
-    id: "3",
-    title: "Design Thinking Workshop",
-    description: "A hands-on workshop to learn design thinking principles and methodologies.",
-    date: "2023-06-25T09:00:00",
-    location: "Design Studio, New York",
-    image: "https://images.unsplash.com/photo-1553877522-43269d4ea984",
-    organizer: "Creative Minds",
-    attendees: 30
-  },
-  {
-    id: "4",
-    title: "AI in Healthcare Conference",
-    description: "Exploring the latest applications of artificial intelligence in healthcare.",
-    date: "2023-07-05T09:00:00",
-    location: "Medical Center, Boston",
-    image: "https://images.unsplash.com/photo-1576091160550-2173dba999ef",
-    organizer: "Health Tech Association",
-    attendees: 200
-  },
-  {
-    id: "5",
-    title: "Mobile App Development Bootcamp",
-    description: "Intensive 2-day bootcamp on building mobile applications.",
-    date: "2023-07-10T10:00:00",
-    location: "Tech Campus, Austin",
-    image: "https://images.unsplash.com/photo-1551650975-87deedd944c3",
-    organizer: "App Developers Guild",
-    attendees: 50
-  },
-  {
-    id: "6",
-    title: "Sustainable Business Summit",
-    description: "Discussing strategies for building environmentally sustainable businesses.",
-    date: "2023-07-15T09:00:00",
-    location: "Green Center, Portland",
-    image: "https://images.unsplash.com/photo-1464692805480-a69dfaafdb0d",
-    organizer: "Eco Business Alliance",
-    attendees: 150
-  }
-];
+type Event = Tables<"events"> & {
+  profiles: Tables<"profiles"> | null;
+  attendee_count: number;
+};
 
 const Events = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [events, setEvents] = useState<Event[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+  
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  const fetchEvents = async () => {
+    setIsLoading(true);
+    try {
+      // Fetch events with organizer profile and attendee count
+      const { data, error } = await supabase
+        .from("events")
+        .select(`
+          *,
+          profiles:organizer_id(*),
+          attendee_count:registrations(count)
+        `)
+        .order('date', { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      // Transform the data to match our Event type
+      const formattedEvents = data.map(event => ({
+        ...event,
+        attendee_count: event.attendee_count[0]?.count || 0
+      }));
+
+      setEvents(formattedEvents);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load events. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   // Filter events based on search term
-  const filteredEvents = mockEvents.filter(event => 
+  const filteredEvents = events.filter(event => 
     event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (event.description?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
     event.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -108,7 +95,11 @@ const Events = () => {
         </div>
       </div>
 
-      {filteredEvents.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center items-center py-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      ) : filteredEvents.length === 0 ? (
         <div className="text-center py-12">
           <h2 className="text-2xl font-semibold mb-2">No events found</h2>
           <p className="text-gray-600 mb-6">Try adjusting your search or create your own event!</p>
@@ -122,7 +113,7 @@ const Events = () => {
             <Card key={event.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <div className="h-48 overflow-hidden">
                 <img 
-                  src={event.image} 
+                  src={event.image_url || "https://images.unsplash.com/photo-1517694712202-14dd9538aa97"} 
                   alt={event.title} 
                   className="w-full h-full object-cover"
                 />
@@ -140,7 +131,7 @@ const Events = () => {
                 <p className="text-gray-600 text-sm mb-3 line-clamp-2">{event.description}</p>
                 <div className="flex items-center text-sm text-gray-500">
                   <Users className="h-4 w-4 mr-1" />
-                  <span>{event.attendees} attendees</span>
+                  <span>{event.attendee_count} attendees</span>
                 </div>
               </CardContent>
               <CardFooter className="p-4 pt-0">

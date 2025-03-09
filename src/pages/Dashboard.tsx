@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -19,89 +19,183 @@ import {
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Tables } from "@/integrations/supabase/types";
 
-// Mock data for user's events
-const mockUserEvents = [
-  {
-    id: "101",
-    title: "Product Design Workshop",
-    description: "Learn the fundamentals of product design in this interactive workshop.",
-    date: "2023-08-15T10:00:00",
-    location: "Design Studio, Seattle",
-    image: "https://images.unsplash.com/photo-1587440871875-191322ee64b0",
-    attendees: 18,
-    status: "upcoming"
-  },
-  {
-    id: "102",
-    title: "JavaScript Fundamentals",
-    description: "A beginner-friendly introduction to JavaScript programming.",
-    date: "2023-08-20T14:00:00",
-    location: "Online",
-    image: "https://images.unsplash.com/photo-1579468118864-1b9ea3c0db4a",
-    attendees: 32,
-    status: "upcoming"
-  },
-  {
-    id: "103",
-    title: "Networking for Startups",
-    description: "Connect with other startup founders and potential investors.",
-    date: "2023-07-10T18:00:00",
-    location: "Innovation Hub, Chicago",
-    image: "https://images.unsplash.com/photo-1540317580384-e5d43867caa6",
-    attendees: 65,
-    status: "past"
-  },
-  {
-    id: "104",
-    title: "Introduction to Machine Learning",
-    description: "Learn the basics of machine learning and AI applications.",
-    date: "2023-06-25T09:00:00",
-    location: "Tech Campus, Boston",
-    image: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e",
-    attendees: 47,
-    status: "past"
-  }
-];
-
-// Mock data for registered events
-const mockRegisteredEvents = [
-  {
-    id: "201",
-    title: "UX Research Methods",
-    description: "Explore different UX research methodologies and when to use them.",
-    date: "2023-08-18T13:00:00",
-    location: "Design Center, Portland",
-    image: "https://images.unsplash.com/photo-1553877522-43269d4ea984",
-    organizer: "Design Thinking Association",
-    status: "upcoming"
-  },
-  {
-    id: "202",
-    title: "Blockchain Technology Summit",
-    description: "Discover the latest trends and applications in blockchain technology.",
-    date: "2023-09-05T09:00:00",
-    location: "Tech Convention Center, San Francisco",
-    image: "https://images.unsplash.com/photo-1639762681057-408e52192e55",
-    organizer: "Blockchain Innovators",
-    status: "upcoming"
-  },
-  {
-    id: "203",
-    title: "Digital Marketing Masterclass",
-    description: "Advanced strategies for digital marketing and social media.",
-    date: "2023-07-12T10:00:00",
-    location: "Online",
-    image: "https://images.unsplash.com/photo-1533750349088-cd871a92f312",
-    organizer: "Marketing Pros",
-    status: "past"
-  }
-];
+type EventWithDetails = Tables<"events"> & {
+  profiles: Tables<"profiles">;
+  attendee_count: number;
+};
 
 const Dashboard = () => {
+  const { toast } = useToast();
+  const { user } = useAuth();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<string | null>(null);
+  const [myEvents, setMyEvents] = useState<EventWithDetails[]>([]);
+  const [registeredEvents, setRegisteredEvents] = useState<EventWithDetails[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      fetchMyEvents();
+      fetchRegisteredEvents();
+    }
+  }, [user]);
+
+  const fetchMyEvents = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("events")
+        .select(`
+          *,
+          profiles(*),
+          attendee_count:registrations(count)
+        `)
+        .eq("organizer_id", user.id)
+        .order('date', { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      // Transform the data to match our EventWithDetails type
+      const formattedEvents = data.map(event => ({
+        ...event,
+        attendee_count: event.attendee_count[0]?.count || 0
+      }));
+
+      setMyEvents(formattedEvents);
+    } catch (error) {
+      console.error("Error fetching my events:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load your events. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchRegisteredEvents = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("registrations")
+        .select(`
+          event_id
+        `)
+        .eq("user_id", user.id);
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.length === 0) {
+        setRegisteredEvents([]);
+        return;
+      }
+
+      // Get the event IDs the user has registered for
+      const eventIds = data.map(registration => registration.event_id);
+
+      // Fetch the details of those events
+      const { data: eventsData, error: eventsError } = await supabase
+        .from("events")
+        .select(`
+          *,
+          profiles(*),
+          attendee_count:registrations(count)
+        `)
+        .in("id", eventIds)
+        .order('date', { ascending: true });
+
+      if (eventsError) {
+        throw eventsError;
+      }
+
+      // Transform the data to match our EventWithDetails type
+      const formattedEvents = eventsData.map(event => ({
+        ...event,
+        attendee_count: event.attendee_count[0]?.count || 0
+      }));
+
+      setRegisteredEvents(formattedEvents);
+    } catch (error) {
+      console.error("Error fetching registered events:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load your registered events. Please try again later.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteClick = (eventId: string) => {
+    setEventToDelete(eventId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!eventToDelete) return;
+
+    try {
+      // First delete all agenda items for this event
+      const { error: agendaError } = await supabase
+        .from("agenda_items")
+        .delete()
+        .eq("event_id", eventToDelete);
+
+      if (agendaError) {
+        throw agendaError;
+      }
+
+      // Then delete all registrations for this event
+      const { error: registrationsError } = await supabase
+        .from("registrations")
+        .delete()
+        .eq("event_id", eventToDelete);
+
+      if (registrationsError) {
+        throw registrationsError;
+      }
+
+      // Finally delete the event itself
+      const { error: eventError } = await supabase
+        .from("events")
+        .delete()
+        .eq("id", eventToDelete);
+
+      if (eventError) {
+        throw eventError;
+      }
+
+      toast({
+        title: "Event Deleted",
+        description: "The event has been successfully deleted."
+      });
+      
+      // Refresh the events list
+      fetchMyEvents();
+      fetchRegisteredEvents();
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the event. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setEventToDelete(null);
+    }
+  };
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -115,20 +209,38 @@ const Dashboard = () => {
     });
   };
 
-  const handleDeleteClick = (eventId: string) => {
-    setEventToDelete(eventId);
-    setDeleteDialogOpen(true);
+  // Check if an event is in the past
+  const isEventPast = (dateString: string) => {
+    const eventDate = new Date(dateString);
+    const now = new Date();
+    return eventDate < now;
   };
 
-  const confirmDelete = () => {
-    // In a real app, this would send a delete request to the server
-    toast({
-      title: "Event Deleted",
-      description: "The event has been successfully deleted."
-    });
-    setDeleteDialogOpen(false);
-    setEventToDelete(null);
-  };
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-16 text-center">
+        <h1 className="text-3xl font-bold mb-4">Authentication Required</h1>
+        <p className="text-gray-600 mb-8">Please log in to view your dashboard.</p>
+        <Button asChild>
+          <Link to="/login">Log In</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-16 flex justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Filter events into upcoming and past
+  const upcomingMyEvents = myEvents.filter(event => !isEventPast(event.date));
+  const pastMyEvents = myEvents.filter(event => isEventPast(event.date));
+  const upcomingRegisteredEvents = registeredEvents.filter(event => !isEventPast(event.date));
+  const pastRegisteredEvents = registeredEvents.filter(event => isEventPast(event.date));
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -153,7 +265,7 @@ const Dashboard = () => {
         {/* My Events Tab */}
         <TabsContent value="my-events">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {mockUserEvents.filter(event => event.status === "upcoming").length === 0 ? (
+            {upcomingMyEvents.length === 0 ? (
               <div className="col-span-full text-center py-12">
                 <h2 className="text-2xl font-semibold mb-2">No upcoming events</h2>
                 <p className="text-gray-600 mb-6">You haven't created any upcoming events yet.</p>
@@ -164,22 +276,80 @@ const Dashboard = () => {
             ) : (
               <>
                 <h2 className="text-xl font-semibold col-span-full mb-2">Upcoming Events</h2>
-                {mockUserEvents
-                  .filter(event => event.status === "upcoming")
-                  .map(event => (
-                    <Card key={event.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                      <div className="h-40 overflow-hidden relative">
-                        <img 
-                          src={event.image} 
-                          alt={event.title} 
-                          className="w-full h-full object-cover"
-                        />
+                {upcomingMyEvents.map(event => (
+                  <Card key={event.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                    <div className="h-40 overflow-hidden relative">
+                      <img 
+                        src={event.image_url || "https://images.unsplash.com/photo-1517694712202-14dd9538aa97"} 
+                        alt={event.title} 
+                        className="w-full h-full object-cover"
+                      />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="absolute top-2 right-2 bg-white/80 hover:bg-white"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link to={`/events/${event.id}`}>View Event</Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-red-600 focus:text-red-600"
+                            onClick={() => handleDeleteClick(event.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete Event
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <CardContent className="p-4">
+                      <div className="flex items-center text-sm text-gray-500 mb-2">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        <span>{formatDate(event.date)}</span>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-500 mb-3">
+                        <MapPin className="h-4 w-4 mr-1" />
+                        <span>{event.location}</span>
+                      </div>
+                      <h3 className="text-xl font-semibold mb-2">{event.title}</h3>
+                      <div className="flex items-center text-sm text-gray-500">
+                        <Users className="h-4 w-4 mr-1" />
+                        <span>{event.attendee_count} attendees</span>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="p-4 pt-0">
+                      <Button asChild variant="outline" className="w-full">
+                        <Link to={`/events/${event.id}`}>Manage Event</Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </>
+            )}
+
+            {pastMyEvents.length > 0 && (
+              <>
+                <h2 className="text-xl font-semibold col-span-full mt-8 mb-2">Past Events</h2>
+                {pastMyEvents.map(event => (
+                  <Card key={event.id} className="overflow-hidden hover:shadow-md transition-shadow opacity-75">
+                    <div className="h-40 overflow-hidden relative">
+                      <img 
+                        src={event.image_url || "https://images.unsplash.com/photo-1517694712202-14dd9538aa97"} 
+                        alt={event.title} 
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-2 right-2">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button 
                               variant="ghost" 
                               size="icon"
-                              className="absolute top-2 right-2 bg-white/80 hover:bg-white"
+                              className="bg-white/80 hover:bg-white"
                             >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
@@ -187,11 +357,6 @@ const Dashboard = () => {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
                               <Link to={`/events/${event.id}`}>View Event</Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link to={`/edit/${event.id}`}>
-                                <Edit className="mr-2 h-4 w-4" /> Edit Event
-                              </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem 
                               className="text-red-600 focus:text-red-600"
@@ -202,91 +367,29 @@ const Dashboard = () => {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                      <CardContent className="p-4">
-                        <div className="flex items-center text-sm text-gray-500 mb-2">
-                          <Calendar className="h-4 w-4 mr-1" />
-                          <span>{formatDate(event.date)}</span>
-                        </div>
-                        <div className="flex items-center text-sm text-gray-500 mb-3">
-                          <MapPin className="h-4 w-4 mr-1" />
-                          <span>{event.location}</span>
-                        </div>
-                        <h3 className="text-xl font-semibold mb-2">{event.title}</h3>
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Users className="h-4 w-4 mr-1" />
-                          <span>{event.attendees} attendees</span>
-                        </div>
-                      </CardContent>
-                      <CardFooter className="p-4 pt-0">
-                        <Button asChild variant="outline" className="w-full">
-                          <Link to={`/events/${event.id}`}>Manage Event</Link>
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  ))}
-              </>
-            )}
-
-            {mockUserEvents.filter(event => event.status === "past").length > 0 && (
-              <>
-                <h2 className="text-xl font-semibold col-span-full mt-8 mb-2">Past Events</h2>
-                {mockUserEvents
-                  .filter(event => event.status === "past")
-                  .map(event => (
-                    <Card key={event.id} className="overflow-hidden hover:shadow-md transition-shadow opacity-75">
-                      <div className="h-40 overflow-hidden relative">
-                        <img 
-                          src={event.image} 
-                          alt={event.title} 
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute top-2 right-2">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="bg-white/80 hover:bg-white"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem asChild>
-                                <Link to={`/events/${event.id}`}>View Event</Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="text-red-600 focus:text-red-600"
-                                onClick={() => handleDeleteClick(event.id)}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete Event
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+                    </div>
+                    <CardContent className="p-4">
+                      <div className="flex items-center text-sm text-gray-500 mb-2">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        <span>{formatDate(event.date)}</span>
                       </div>
-                      <CardContent className="p-4">
-                        <div className="flex items-center text-sm text-gray-500 mb-2">
-                          <Calendar className="h-4 w-4 mr-1" />
-                          <span>{formatDate(event.date)}</span>
-                        </div>
-                        <div className="flex items-center text-sm text-gray-500 mb-3">
-                          <MapPin className="h-4 w-4 mr-1" />
-                          <span>{event.location}</span>
-                        </div>
-                        <h3 className="text-xl font-semibold mb-2">{event.title}</h3>
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Users className="h-4 w-4 mr-1" />
-                          <span>{event.attendees} attendees</span>
-                        </div>
-                      </CardContent>
-                      <CardFooter className="p-4 pt-0">
-                        <Button asChild variant="outline" className="w-full">
-                          <Link to={`/events/${event.id}`}>View Details</Link>
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  ))}
+                      <div className="flex items-center text-sm text-gray-500 mb-3">
+                        <MapPin className="h-4 w-4 mr-1" />
+                        <span>{event.location}</span>
+                      </div>
+                      <h3 className="text-xl font-semibold mb-2">{event.title}</h3>
+                      <div className="flex items-center text-sm text-gray-500">
+                        <Users className="h-4 w-4 mr-1" />
+                        <span>{event.attendee_count} attendees</span>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="p-4 pt-0">
+                      <Button asChild variant="outline" className="w-full">
+                        <Link to={`/events/${event.id}`}>View Details</Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
               </>
             )}
           </div>
@@ -295,7 +398,7 @@ const Dashboard = () => {
         {/* Registered Events Tab */}
         <TabsContent value="registered">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {mockRegisteredEvents.filter(event => event.status === "upcoming").length === 0 ? (
+            {upcomingRegisteredEvents.length === 0 ? (
               <div className="col-span-full text-center py-12">
                 <h2 className="text-2xl font-semibold mb-2">No upcoming registrations</h2>
                 <p className="text-gray-600 mb-6">You haven't registered for any upcoming events.</p>
@@ -306,72 +409,72 @@ const Dashboard = () => {
             ) : (
               <>
                 <h2 className="text-xl font-semibold col-span-full mb-2">Upcoming Registrations</h2>
-                {mockRegisteredEvents
-                  .filter(event => event.status === "upcoming")
-                  .map(event => (
-                    <Card key={event.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                      <div className="h-40 overflow-hidden">
-                        <img 
-                          src={event.image} 
-                          alt={event.title} 
-                          className="w-full h-full object-cover"
-                        />
+                {upcomingRegisteredEvents.map(event => (
+                  <Card key={event.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                    <div className="h-40 overflow-hidden">
+                      <img 
+                        src={event.image_url || "https://images.unsplash.com/photo-1517694712202-14dd9538aa97"} 
+                        alt={event.title} 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <CardContent className="p-4">
+                      <div className="flex items-center text-sm text-gray-500 mb-2">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        <span>{formatDate(event.date)}</span>
                       </div>
-                      <CardContent className="p-4">
-                        <div className="flex items-center text-sm text-gray-500 mb-2">
-                          <Calendar className="h-4 w-4 mr-1" />
-                          <span>{formatDate(event.date)}</span>
-                        </div>
-                        <div className="flex items-center text-sm text-gray-500 mb-3">
-                          <MapPin className="h-4 w-4 mr-1" />
-                          <span>{event.location}</span>
-                        </div>
-                        <h3 className="text-xl font-semibold mb-2">{event.title}</h3>
-                        <p className="text-sm text-gray-600 mb-2">Organized by: {event.organizer}</p>
-                      </CardContent>
-                      <CardFooter className="p-4 pt-0">
-                        <Button asChild className="w-full">
-                          <Link to={`/events/${event.id}`}>View Event</Link>
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  ))}
+                      <div className="flex items-center text-sm text-gray-500 mb-3">
+                        <MapPin className="h-4 w-4 mr-1" />
+                        <span>{event.location}</span>
+                      </div>
+                      <h3 className="text-xl font-semibold mb-2">{event.title}</h3>
+                      <p className="text-sm text-gray-600 mb-2">
+                        Organized by: {event.profiles.full_name || "Event Organizer"}
+                      </p>
+                    </CardContent>
+                    <CardFooter className="p-4 pt-0">
+                      <Button asChild className="w-full">
+                        <Link to={`/events/${event.id}`}>View Event</Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
               </>
             )}
 
-            {mockRegisteredEvents.filter(event => event.status === "past").length > 0 && (
+            {pastRegisteredEvents.length > 0 && (
               <>
                 <h2 className="text-xl font-semibold col-span-full mt-8 mb-2">Past Registrations</h2>
-                {mockRegisteredEvents
-                  .filter(event => event.status === "past")
-                  .map(event => (
-                    <Card key={event.id} className="overflow-hidden hover:shadow-md transition-shadow opacity-75">
-                      <div className="h-40 overflow-hidden">
-                        <img 
-                          src={event.image} 
-                          alt={event.title} 
-                          className="w-full h-full object-cover"
-                        />
+                {pastRegisteredEvents.map(event => (
+                  <Card key={event.id} className="overflow-hidden hover:shadow-md transition-shadow opacity-75">
+                    <div className="h-40 overflow-hidden">
+                      <img 
+                        src={event.image_url || "https://images.unsplash.com/photo-1517694712202-14dd9538aa97"} 
+                        alt={event.title} 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <CardContent className="p-4">
+                      <div className="flex items-center text-sm text-gray-500 mb-2">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        <span>{formatDate(event.date)}</span>
                       </div>
-                      <CardContent className="p-4">
-                        <div className="flex items-center text-sm text-gray-500 mb-2">
-                          <Calendar className="h-4 w-4 mr-1" />
-                          <span>{formatDate(event.date)}</span>
-                        </div>
-                        <div className="flex items-center text-sm text-gray-500 mb-3">
-                          <MapPin className="h-4 w-4 mr-1" />
-                          <span>{event.location}</span>
-                        </div>
-                        <h3 className="text-xl font-semibold mb-2">{event.title}</h3>
-                        <p className="text-sm text-gray-600 mb-2">Organized by: {event.organizer}</p>
-                      </CardContent>
-                      <CardFooter className="p-4 pt-0">
-                        <Button asChild variant="outline" className="w-full">
-                          <Link to={`/events/${event.id}`}>View Details</Link>
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  ))}
+                      <div className="flex items-center text-sm text-gray-500 mb-3">
+                        <MapPin className="h-4 w-4 mr-1" />
+                        <span>{event.location}</span>
+                      </div>
+                      <h3 className="text-xl font-semibold mb-2">{event.title}</h3>
+                      <p className="text-sm text-gray-600 mb-2">
+                        Organized by: {event.profiles.full_name || "Event Organizer"}
+                      </p>
+                    </CardContent>
+                    <CardFooter className="p-4 pt-0">
+                      <Button asChild variant="outline" className="w-full">
+                        <Link to={`/events/${event.id}`}>View Details</Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
               </>
             )}
           </div>
