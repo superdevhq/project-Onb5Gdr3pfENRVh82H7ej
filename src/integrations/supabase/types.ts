@@ -9,7 +9,148 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      agenda_items: {
+        Row: {
+          created_at: string
+          display_order: number
+          event_id: string
+          id: string
+          time: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          display_order: number
+          event_id: string
+          id?: string
+          time: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          event_id?: string
+          id?: string
+          time?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_items_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          created_at: string
+          date: string
+          description: string | null
+          end_time: string
+          id: string
+          image_url: string | null
+          location: string
+          organizer_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          description?: string | null
+          end_time: string
+          id?: string
+          image_url?: string | null
+          location: string
+          organizer_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          description?: string | null
+          end_time?: string
+          id?: string
+          image_url?: string | null
+          location?: string
+          organizer_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_organizer_id_fkey"
+            columns: ["organizer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      registrations: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registrations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registrations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
