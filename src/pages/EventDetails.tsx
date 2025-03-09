@@ -39,26 +39,33 @@ const EventDetails = () => {
       fetchEventDetails();
       fetchAttendeeCount();
     }
+  }, [id]);
 
-    // Set up real-time subscription for registrations
-    if (id) {
-      const registrationsSubscription = supabase
-        .channel('event-registrations')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'registrations',
-          filter: `event_id=eq.${id}`
-        }, () => {
-          // Refresh attendee count when registrations change
-          fetchAttendeeCount();
-        })
-        .subscribe();
+  // Set up real-time subscription for registrations
+  useEffect(() => {
+    if (!id) return;
 
-      return () => {
-        supabase.removeChannel(registrationsSubscription);
-      };
-    }
+    console.log("Setting up real-time subscription for event:", id);
+    
+    const channel = supabase
+      .channel(`public:registrations:event_id=eq.${id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'registrations',
+        filter: `event_id=eq.${id}`
+      }, (payload) => {
+        console.log("Registration change detected:", payload);
+        fetchAttendeeCount();
+      })
+      .subscribe((status) => {
+        console.log("Subscription status:", status);
+      });
+
+    return () => {
+      console.log("Cleaning up subscription");
+      supabase.removeChannel(channel);
+    };
   }, [id]);
 
   useEffect(() => {
@@ -110,6 +117,7 @@ const EventDetails = () => {
     if (!id) return;
     
     try {
+      console.log("Fetching attendee count for event:", id);
       const { count, error } = await supabase
         .from("registrations")
         .select('*', { count: 'exact', head: true })
@@ -119,6 +127,7 @@ const EventDetails = () => {
         throw error;
       }
 
+      console.log("New attendee count:", count);
       setAttendeeCount(count || 0);
       
       // Update event object if it exists
@@ -183,7 +192,8 @@ const EventDetails = () => {
       
       setIsUserRegistered(true);
       setIsRegisterDialogOpen(false);
-      // Attendee count will be updated by the subscription
+      // Fetch the updated count immediately
+      fetchAttendeeCount();
     } catch (error) {
       console.error("Error registering for event:", error);
       toast({
@@ -217,7 +227,8 @@ const EventDetails = () => {
       });
       
       setIsUserRegistered(false);
-      // Attendee count will be updated by the subscription
+      // Fetch the updated count immediately
+      fetchAttendeeCount();
     } catch (error) {
       console.error("Error cancelling registration:", error);
       toast({

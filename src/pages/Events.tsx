@@ -22,24 +22,65 @@ const Events = () => {
   
   useEffect(() => {
     fetchEvents();
+  }, []);
 
-    // Set up real-time subscription for registrations
-    const registrationsSubscription = supabase
-      .channel('public-registrations')
+  // Set up real-time subscription for registrations
+  useEffect(() => {
+    console.log("Setting up real-time subscription for all registrations");
+    
+    const channel = supabase
+      .channel('public:registrations')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'registrations'
-      }, () => {
-        // Refresh events when registrations change
-        fetchEvents();
+      }, (payload) => {
+        console.log("Registration change detected:", payload);
+        
+        // Update the count for the affected event
+        if (payload.new && payload.new.event_id) {
+          updateEventAttendeeCount(payload.new.event_id);
+        } else if (payload.old && payload.old.event_id) {
+          updateEventAttendeeCount(payload.old.event_id);
+        }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Subscription status:", status);
+      });
 
     return () => {
-      supabase.removeChannel(registrationsSubscription);
+      console.log("Cleaning up subscription");
+      supabase.removeChannel(channel);
     };
   }, []);
+
+  const updateEventAttendeeCount = async (eventId: string) => {
+    try {
+      console.log("Updating attendee count for event:", eventId);
+      
+      const { count, error } = await supabase
+        .from("registrations")
+        .select('*', { count: 'exact', head: true })
+        .eq("event_id", eventId);
+
+      if (error) {
+        throw error;
+      }
+
+      console.log("New attendee count for event", eventId, ":", count);
+      
+      // Update the specific event in the state
+      setEvents(prevEvents => 
+        prevEvents.map(event => 
+          event.id === eventId 
+            ? { ...event, attendee_count: count || 0 } 
+            : event
+        )
+      );
+    } catch (error) {
+      console.error("Error updating attendee count:", error);
+    }
+  };
 
   const fetchEvents = async () => {
     setIsLoading(true);
