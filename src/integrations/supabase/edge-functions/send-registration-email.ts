@@ -2,50 +2,90 @@
 // Follow this setup guide to integrate the Deno runtime and Supabase Functions in your project:
 // https://supabase.com/docs/guides/functions/connect-to-supabase
 
-// Using a CDN URL that's compatible with Deno's --no-npm and --no-remote restrictions
-// This is a workaround - in production, you should use proper dependency management
-const supabaseJs = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.4/dist/module/index.js'
-const { createClient } = await import(supabaseJs)
+// Since we can't use npm or remote imports, we'll implement a minimal client
+// This is a simplified version just for this function
+const createClient = (supabaseUrl, supabaseKey) => {
+  const headers = {
+    'apikey': supabaseKey,
+    'Authorization': `Bearer ${supabaseKey}`,
+    'Content-Type': 'application/json'
+  };
+
+  return {
+    from: (table) => ({
+      select: (columns) => ({
+        eq: (column, value) => ({
+          single: async () => {
+            try {
+              const response = await fetch(`${supabaseUrl}/rest/v1/${table}?select=${columns}&${column}=eq.${value}&limit=1`, {
+                headers
+              });
+              const data = await response.json();
+              return { data: data[0] || null, error: null };
+            } catch (error) {
+              return { data: null, error };
+            }
+          }
+        })
+      })
+    }),
+    auth: {
+      admin: {
+        getUserById: async (userId) => {
+          try {
+            const response = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+              headers
+            });
+            const user = await response.json();
+            return { data: { user }, error: null };
+          } catch (error) {
+            return { data: null, error };
+          }
+        }
+      }
+    }
+  };
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 Deno.serve(async (req) => {
   // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
     // Get the request body
-    const { registration_id } = await req.json()
+    const { registration_id } = await req.json();
     
     if (!registration_id) {
       return new Response(
         JSON.stringify({ error: 'Registration ID is required' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
+      );
     }
 
     // Create Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get registration details
     const { data: registration, error: registrationError } = await supabase
       .from('registrations')
       .select('*, events(*), profiles:user_id(*)')
       .eq('id', registration_id)
-      .single()
+      .single();
 
     if (registrationError || !registration) {
       return new Response(
         JSON.stringify({ error: 'Registration not found', details: registrationError }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
-      )
+      );
     }
 
     // Get user email from auth.users
@@ -54,35 +94,35 @@ Deno.serve(async (req) => {
       .from('profiles')
       .select('email')
       .eq('id', registration.user_id)
-      .single()
+      .single();
 
     if (userError || !userProfileData?.email) {
       // Try to get email from auth.users directly
       const { data: authUser, error: authUserError } = await supabase.auth.admin
-        .getUserById(registration.user_id)
+        .getUserById(registration.user_id);
 
       if (authUserError || !authUser.user) {
         return new Response(
           JSON.stringify({ error: 'User not found', details: authUserError || userError }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
-        )
+        );
       }
 
-      userData = { email: authUser.user.email }
+      userData = { email: authUser.user.email };
     } else {
-      userData = userProfileData
+      userData = userProfileData;
     }
 
     // Send email using Resend
-    const resendApiKey = Deno.env.get('RESEND_API_KEY')
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
     if (!resendApiKey) {
       return new Response(
         JSON.stringify({ error: 'Resend API key not configured' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      )
+      );
     }
 
-    const eventName = registration.events?.name || 'the event'
+    const eventName = registration.events?.name || 'the event';
     const eventDate = registration.events?.date 
       ? new Date(registration.events.date).toLocaleDateString('en-US', { 
           weekday: 'long', 
@@ -90,7 +130,7 @@ Deno.serve(async (req) => {
           month: 'long', 
           day: 'numeric' 
         })
-      : 'the scheduled date'
+      : 'the scheduled date';
 
     const emailResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -117,9 +157,9 @@ Deno.serve(async (req) => {
           </div>
         `
       })
-    })
+    });
 
-    const emailResult = await emailResponse.json()
+    const emailResult = await emailResponse.json();
 
     return new Response(
       JSON.stringify({ 
@@ -128,12 +168,12 @@ Deno.serve(async (req) => {
         email: emailResult
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    );
 
   } catch (error) {
     return new Response(
       JSON.stringify({ error: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    )
+    );
   }
-})
+});
