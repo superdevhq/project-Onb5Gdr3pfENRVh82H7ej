@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { useAuth } from "@/contexts/AuthContext";
+import { sendRegistrationEmail } from "@/integrations/supabase/sendRegistrationEmail";
 
 type EventWithDetails = Tables<"events"> & {
   profiles: Tables<"profiles"> | null;
@@ -213,20 +214,30 @@ const EventDetails = () => {
       }
 
       // Register the user
-      const { error } = await supabase
+      const { data: registration, error } = await supabase
         .from("registrations")
         .insert({
           event_id: event.id,
           user_id: user.id
-        });
+        })
+        .select()
+        .single();
 
       if (error) {
         throw error;
       }
 
+      // Send confirmation email
+      try {
+        await sendRegistrationEmail(registration.id);
+      } catch (emailError) {
+        console.error("Error sending confirmation email:", emailError);
+        // Don't fail the registration if email fails
+      }
+
       toast({
         title: "Registration Successful!",
-        description: `You're registered for ${event.title}.`
+        description: `You're registered for ${event.title}. A confirmation email has been sent.`
       });
       
       setIsUserRegistered(true);
