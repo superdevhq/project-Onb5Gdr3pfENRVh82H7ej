@@ -13,7 +13,7 @@ import { Tables } from "@/integrations/supabase/types";
 import { useAuth } from "@/contexts/AuthContext";
 
 type EventWithDetails = Tables<"events"> & {
-  profiles: Tables<"profiles">;
+  profiles: Tables<"profiles"> | null;
   agenda_items: {
     id: string;
     title: string;
@@ -239,6 +239,10 @@ const EventDetails = () => {
     );
   }
 
+  // Get organizer name and avatar with fallbacks
+  const organizerName = event.profiles?.full_name || "Event Organizer";
+  const organizerAvatar = event.profiles?.avatar_url || "https://randomuser.me/api/portraits/lego/1.jpg";
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Event Header */}
@@ -287,12 +291,12 @@ const EventDetails = () => {
             <h2 className="text-2xl font-semibold mb-4">Organizer</h2>
             <div className="flex items-center">
               <img 
-                src={event.profiles.avatar_url || "https://randomuser.me/api/portraits/lego/1.jpg"} 
-                alt={event.profiles.full_name || "Event Organizer"} 
+                src={organizerAvatar} 
+                alt={organizerName} 
                 className="w-12 h-12 rounded-full mr-4"
               />
               <div>
-                <h3 className="font-medium">{event.profiles.full_name || "Event Organizer"}</h3>
+                <h3 className="font-medium">{organizerName}</h3>
                 <p className="text-gray-600 text-sm">Event Organizer</p>
               </div>
             </div>
