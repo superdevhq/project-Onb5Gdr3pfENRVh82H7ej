@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
         'Authorization': `Bearer ${resendApiKey}`
       },
       body: JSON.stringify({
-        from: 'Luma Events <events@luma-clone.com>',
+        from: "no-reply@updates.trytadam.com",
         to: userData.email,
         subject: `Registration Confirmed: ${eventName}`,
         html: `
