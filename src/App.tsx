@@ -1,101 +1,144 @@
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import Layout from "./components/layout/Layout";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import Events from "./pages/Events";
-import EventDetails from "./pages/EventDetails";
-import CreateEvent from "./pages/CreateEvent";
-import Dashboard from "./pages/Dashboard";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Toaster } from "@/components/ui/sonner";
+import Layout from "@/components/layout/Layout";
+import ModernLayout from "@/components/layout/ModernLayout";
+import Index from "@/pages/Index";
+import Login from "@/pages/Login";
+import Signup from "@/pages/Signup";
+import Dashboard from "@/pages/Dashboard";
+import Events from "@/pages/Events";
+import EventDetails from "@/pages/EventDetails";
+import CreateEvent from "@/pages/CreateEvent";
+import NotFound from "@/pages/NotFound";
+import { AuthProvider } from "@/contexts/AuthContext";
+import "./App.css";
 
-const queryClient = new QueryClient();
-
-// Protected route component
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
-  }
-  
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return <>{children}</>;
-};
-
-// Public route that redirects if user is already authenticated
-const AuthRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
-  }
-  
-  if (user) {
-    return <Navigate to="/dashboard" replace />;
-  }
-  
-  return <>{children}</>;
-};
-
-const AppRoutes = () => {
+function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Layout><Index /></Layout>} />
-      <Route path="/events" element={<Layout><Events /></Layout>} />
-      <Route path="/events/:id" element={<Layout><EventDetails /></Layout>} />
-      
-      {/* Protected routes */}
-      <Route path="/create" element={
-        <ProtectedRoute>
-          <Layout><CreateEvent /></Layout>
-        </ProtectedRoute>
-      } />
-      <Route path="/dashboard" element={
-        <ProtectedRoute>
-          <Layout><Dashboard /></Layout>
-        </ProtectedRoute>
-      } />
-      
-      {/* Auth routes */}
-      <Route path="/login" element={
-        <AuthRoute>
-          <Login />
-        </AuthRoute>
-      } />
-      <Route path="/signup" element={
-        <AuthRoute>
-          <Signup />
-        </AuthRoute>
-      } />
-      
-      {/* Catch-all route */}
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  );
-};
+    <AuthProvider>
+      <Router>
+        <Routes>
+          {/* Pages with Modern Layout */}
+          <Route
+            path="/"
+            element={
+              <ModernLayout>
+                <Index />
+              </ModernLayout>
+            }
+          />
+          <Route
+            path="/events"
+            element={
+              <ModernLayout>
+                <Events />
+              </ModernLayout>
+            }
+          />
+          <Route
+            path="/events/:id"
+            element={
+              <ModernLayout>
+                <EventDetails />
+              </ModernLayout>
+            }
+          />
+          <Route
+            path="/how-it-works"
+            element={
+              <ModernLayout>
+                <div className="container mx-auto px-4 py-12">
+                  <h1 className="text-3xl font-bold mb-6">How It Works</h1>
+                  <p className="text-white/70">This page is under construction.</p>
+                </div>
+              </ModernLayout>
+            }
+          />
+          <Route
+            path="/pricing"
+            element={
+              <ModernLayout>
+                <div className="container mx-auto px-4 py-12">
+                  <h1 className="text-3xl font-bold mb-6">Pricing</h1>
+                  <p className="text-white/70">This page is under construction.</p>
+                </div>
+              </ModernLayout>
+            }
+          />
+          <Route
+            path="/help"
+            element={
+              <ModernLayout>
+                <div className="container mx-auto px-4 py-12">
+                  <h1 className="text-3xl font-bold mb-6">Help Center</h1>
+                  <p className="text-white/70">This page is under construction.</p>
+                </div>
+              </ModernLayout>
+            }
+          />
+          <Route
+            path="/search"
+            element={
+              <ModernLayout>
+                <div className="container mx-auto px-4 py-12">
+                  <h1 className="text-3xl font-bold mb-6">Search Events</h1>
+                  <p className="text-white/70">This page is under construction.</p>
+                </div>
+              </ModernLayout>
+            }
+          />
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
+          {/* Auth Pages */}
+          <Route
+            path="/login"
+            element={
+              <ModernLayout>
+                <Login />
+              </ModernLayout>
+            }
+          />
+          <Route
+            path="/signup"
+            element={
+              <ModernLayout>
+                <Signup />
+              </ModernLayout>
+            }
+          />
+
+          {/* Dashboard Pages */}
+          <Route
+            path="/dashboard"
+            element={
+              <ModernLayout>
+                <Dashboard />
+              </ModernLayout>
+            }
+          />
+          <Route
+            path="/create"
+            element={
+              <ModernLayout>
+                <CreateEvent />
+              </ModernLayout>
+            }
+          />
+
+          {/* 404 Page */}
+          <Route
+            path="*"
+            element={
+              <ModernLayout>
+                <NotFound />
+              </ModernLayout>
+            }
+          />
+        </Routes>
         <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+      </Router>
+    </AuthProvider>
+  );
+}
 
 export default App;
